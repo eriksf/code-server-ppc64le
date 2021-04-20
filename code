@@ -1,0 +1,43 @@
+#!/bin/sh
+
+CODE_SERVER="$SCRATCH/singularity_cache/code-server_ppc64le-0.0.8.sif"
+
+hostname=$(hostname -f)
+
+abs=$(realpath .)
+req=$1
+
+if [[ -z $1 ]]
+then
+    req="$abs"
+fi
+
+if [[ ! $1 =~ ^\/ ]]
+then
+    req="$abs/$1"
+fi
+
+if [[ ! -d $req ]]
+then
+    echo "ERROR: path does not exist"
+    echo "$req"
+    exit 1
+fi
+
+# check for singularity
+if [[ ! $(type -P "singularity") ]]
+then
+    echo "singularity not found. Please load the tacc-singularity module: 'module load tacc-singularity'"
+    exit 1
+fi
+
+while
+    port=$(( ($RANDOM % 1000) + 50000 ))
+    used_ports=$(netstat -tln)
+    [[ "$used_ports" =~ tcp.*:"$port".*LISTEN ]]
+do true; done
+
+echo "Please connect to the server at http://$hostname:$port. The password is located in '~/.config/code-server/config.yaml'. In order +++to stop the code-server, type 'singularity instance stop codeserver1'."
+singularity instance start $CODE_SERVER codeserver1 >$HOME/codeserver1.log 2>&1
+sleep 2
+singularity exec instance://codeserver1 /usr/local/bin/code-server --bind-addr "0.0.0.0:$port" $req >>$HOME/codeserver1.log 2>&1 &
